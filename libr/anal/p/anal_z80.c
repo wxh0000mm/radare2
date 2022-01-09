@@ -369,6 +369,7 @@ static bool set_reg_profile(RAnal *anal) {
 	const char *p =
 		"=PC	mpc\n"
 		"=SP	sp\n"
+		"=SN	a\n"
 		"=A0	af\n"
 		"=A1	bc\n"
 		"=A2	de\n"
@@ -430,6 +431,7 @@ RAnalPlugin r_anal_plugin_z80 = {
 	.desc = "Z80 CPU code analysis plugin",
 	.archinfo = archinfo,
 	.op = &z80_anal_op,
+	.opasm = &z80_anal_opasm,
 };
 
 #ifndef R2_PLUGIN_INCORE
