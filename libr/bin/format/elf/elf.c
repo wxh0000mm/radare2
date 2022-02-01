@@ -2672,6 +2672,7 @@ static void fix_rva_and_offset_relocable_file(ELFOBJ *bin, RBinElfReloc *r, size
 }
 
 static void fix_rva_and_offset_exec_file(ELFOBJ *bin, RBinElfReloc *r) {
+	// read target and fix patch
 	r->rva = r->offset;
 	r->offset = Elf_(r_bin_elf_v2p) (bin, r->offset);
 }
@@ -2890,7 +2891,6 @@ RBinElfReloc* Elf_(r_bin_elf_get_relocs) (ELFOBJ *bin) {
 	if (!bin) {
 		return NULL;
 	}
-
 	if (!bin->g_relocs) {
 		bin->g_relocs = populate_relocs_record (bin);
 	}

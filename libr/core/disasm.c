@@ -4436,7 +4436,17 @@ static void ds_print_relocs(RDisasmState *ds) {
 	bool demangle = r_config_get_i (core->config, "asm.demangle");
 	bool keep_lib = r_config_get_i (core->config, "bin.demangle.libs");
 	RBinReloc *rel = r_core_getreloc (core, ds->at, ds->analop.size);
+r_cons_printf ("reloc(%llx)\n", ds->at);
+#if 0
+	if (!rel) {
+		ut8 buf[8];
+		r_io_read_at (core->io, ds->at, buf, 8);
+		ut64 n = r_read_le64 (buf);
+		rel = r_core_getreloc (core, n, ds->analop.size);
+	}
+#endif
 	if (rel) {
+r_cons_printf ("(R)");
 		int cstrlen = 0;
 		char *ll = r_cons_lastline (&cstrlen);
 		if (!ll) {

@@ -760,7 +760,19 @@ static RList* relocs(RBinFile *bf) {
 	return ret;
 }
 
-static void _patch_reloc(struct Elf_(r_bin_elf_obj_t) *bo, ut16 e_machine, RIOBind *iob, RBinElfReloc *rel, ut64 S, ut64 B, ut64 L) {
+// copypasta from bin/bobj.c:17
+static int reloc_cmp(void *incoming, void *in, void *user) {
+	RBinReloc *_incoming = (RBinReloc *)incoming;
+	RBinReloc *_in = (RBinReloc *)in;
+	if (_incoming->vaddr > _in->vaddr) {
+		return 1;
+	}
+	if (_incoming->vaddr < _in->vaddr) {
+		return -1;
+	}
+	return 0;
+}
+static void _patch_reloc(RBinObject *binobj, struct Elf_(r_bin_elf_obj_t) *bo, ut16 e_machine, RIOBind *iob, RBinElfReloc *rel, ut64 S, ut64 B, ut64 L) {
 	ut64 V = 0;
 	ut64 A = rel->addend;
 	ut64 P = rel->rva;
@@ -781,11 +793,23 @@ static void _patch_reloc(struct Elf_(r_bin_elf_obj_t) *bo, ut16 e_machine, RIOBi
 		iob->read_at (iob->io, rel->rva, buf, 8);
 		// only patch the relocs that are initialized with zeroes
 		// if the destination contains a different value it's a constant useful for static analysis
-		if (r_read_le64 (buf) == 0) {
-			r_write_le64 (buf, S);
-			iob->write_at (iob->io, rel->rva, buf, 8);
-		} else {
+		ut64 addr = r_read_le64 (buf);
+		if (addr) {
+// eprintf ("%llx -> %llx\n", rel->rva, r_read_le64 (buf));
 			r_write_le64 (buf, A);
+			iob->write_at (iob->io, rel->rva, buf, 8);
+#if 0
+			rel->rva = r_read_le64 (buf);
+			// move in the rbtree
+			void *p = binobj->relocs->free;
+			binobj->relocs->free = NULL;
+			r_crbtree_delete (binobj->relocs, rel, reloc_cmp, NULL);
+			rel->rva = r_read_le64 (buf);
+			r_crbtree_insert (binobj->relocs, rel, reloc_cmp, NULL);
+			binobj->relocs->free = p;
+#endif
+		} else {
+			r_write_le64 (buf, S);
 			iob->write_at (iob->io, rel->rva, buf, 8);
 		}
 		break;
@@ -1015,7 +1039,7 @@ static RList* patch_relocs(RBin *b) {
 		}
 		//ut64 raddr = sym_addr? sym_addr: vaddr;
 		ut64 raddr = (sym_addr && sym_addr != UT64_MAX)? sym_addr: vaddr;
-		_patch_reloc (bin, bin->ehdr.e_machine, &b->iob, &relcs[i], raddr, 0, plt_entry_addr);
+		_patch_reloc (obj, bin, bin->ehdr.e_machine, &b->iob, &relcs[i], raddr, 0, plt_entry_addr);
 		if (!(ptr = reloc_convert (bin, &relcs[i], n_vaddr))) {
 			continue;
 		}
