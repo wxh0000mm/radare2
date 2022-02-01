@@ -102,7 +102,7 @@ generate_configmk () {
   splugins=""
   plugins=""
   oldlib=""
-  for a in ${STATIC} ${SHARED} ; do
+  for a in `echo "${STATIC} ${SHARED}" | tr " " "\n" | sort` ; do
     lib=$(echo $a | cut -d . -f 1) # library
     plg=$(echo $a | cut -d . -f 2) # plugin name
     if [ ! "$oldlib" = "$lib" ]; then
@@ -117,7 +117,6 @@ generate_configmk () {
 
   echo
 
-  # fill the holes with love
   for a in ${SHARED} ; do
     lib=$(echo $a | cut -d . -f 1) # library
     plg=$(echo $a | cut -d . -f 2) # plugin name
@@ -129,16 +128,6 @@ generate_configmk () {
     printf " p/io_${plg}.${EXT}"
   done
   echo
-
-  # fill the shared holes
-  for a in ${STATIC} ; do
-    lib=$(echo $a | cut -d . -f 1) # library
-    uclib=$(echo $lib | tr '[a-z]' '[A-Z]')
-    if [ -z "`echo ${splugins} | grep __${uclib}`" ]; then
-      splugins="${splugins} __${uclib}"
-      echo "SHARED_${uclib}_PLUGINS="
-    fi
-  done
 }
 
 generate () {

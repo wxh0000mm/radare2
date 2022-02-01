@@ -1,10 +1,12 @@
+ifeq ($(SHM_GUARD),)
+SHM_GUARD=1
 N=shm
 OBJ_SHM=io_shm.o
 CSRC_SHM=$(subst .o,.c,$(OBJ_SHM))
 
 STATIC_OBJ+=${OBJ_SHM}
 TARGET_SHM=io_shm.${EXT_SO}
-ALL_TARGETS+=${TARGET_SHM}
+#ALL_TARGETS+=${TARGET_SHM}
 
 ifeq (${OSTYPE},gnulinux)
 LDFLAGS+=-lrt
@@ -20,3 +22,4 @@ endif
 
 $(N) p/${TARGET_SHM}: p/${OBJ_SHM}
 	cd p && $(CC) -shared -L.. $(CSRC_SHM) -fPIC -o $(TARGET_SHM) -I../../include -I../../../shlr/sdb/src $(LINKFLAGS)
+endif
