@@ -29,7 +29,7 @@ endif
 
 .PHONY: pre
 pre: libr_io.${EXT_SO} libr_io.${EXT_AR}
-#	@$(MAKE) -C p
+	@$(MAKE) -C p
 	$(MAKE) $(SHARED_IO_TARGETS)
 
 include ${STATIC_IO_PLUGINS}
