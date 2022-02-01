@@ -778,8 +778,13 @@ static void _patch_reloc(struct Elf_(r_bin_elf_obj_t) *bo, ut16 e_machine, RIOBi
 		break;
 	case EM_AARCH64:
 		V = S + A;
-		r_write_le64 (buf, V);
-		iob->write_at (iob->io, rel->rva, buf, 8);
+		iob->read_at (iob->io, rel->rva, buf, 8);
+		// only patch the relocs that are initialized with zeroes
+		// if the destination contains a different value it's a constant useful for static analysis
+		if (r_read_le64 (buf) == 0) {
+			r_write_le64 (buf, V);
+			iob->write_at (iob->io, rel->rva, buf, 8);
+		}
 		break;
 	case EM_PPC64: {
 		int low = 0, word = 0;
