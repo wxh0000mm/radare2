@@ -19,4 +19,4 @@ LINKFLAGS+=-L.. -lr_io
 endif
 
 $(N) p/${TARGET_SHM}: p/${OBJ_SHM}
-	cd p && $(CC_LIB) -L.. $(CSRC_SHM) -fPIC -o io_shm.$(EXT_SO) -I../../include -I../../../shlr/sdb/src $(LDFLAGS)
+	cd p && $(CC) -shared -L.. $(CSRC_SHM) -fPIC -o $(TARGET_SHM) -I../../include -I../../../shlr/sdb/src $(LINKFLAGS)

@@ -82,7 +82,7 @@ else
 	@-if [ -f d/Makefile ] ; then (echo "DIR ${NAME}/d"; ${MAKE} -C d) ; fi
 endif
 
-prelib-build: $(EXTRA_TARGETS)
+prelib-build:
 	$(MAKE) $(OBJS)
 
 ifeq ($(WITH_LIBS),1)
