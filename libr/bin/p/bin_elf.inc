@@ -764,7 +764,7 @@ static void _patch_reloc(struct Elf_(r_bin_elf_obj_t) *bo, ut16 e_machine, RIOBi
 	ut64 V = 0;
 	ut64 A = rel->addend;
 	ut64 P = rel->rva;
-	ut8 buf[8];
+	ut8 buf[8] = {0};
 	switch (e_machine) {
 	case EM_ARM:
 		if (!rel->sym && rel->mode == DT_REL) {
@@ -782,7 +782,10 @@ static void _patch_reloc(struct Elf_(r_bin_elf_obj_t) *bo, ut16 e_machine, RIOBi
 		// only patch the relocs that are initialized with zeroes
 		// if the destination contains a different value it's a constant useful for static analysis
 		if (r_read_le64 (buf) == 0) {
-			r_write_le64 (buf, V);
+			r_write_le64 (buf, S);
+			iob->write_at (iob->io, rel->rva, buf, 8);
+		} else {
+			r_write_le64 (buf, A);
 			iob->write_at (iob->io, rel->rva, buf, 8);
 		}
 		break;
