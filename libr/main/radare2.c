@@ -565,9 +565,10 @@ R_API int r_main_radare2(int argc, const char **argv) {
 			do_list_io_plugins = true;
 			break;
 		case 'm':
+			r_config_set_i (r->config, "io.va", 1);
 			mapaddr = r_num_math (r->num, opt.arg);
 			s_seek = opt.arg;
-			r_config_set_i (r->config, "file.offset", mapaddr);
+			r_config_set_i (r->config, "file.offset", mapaddr); // XXX deprecate
 			break;
 		case 'M':
 			r_config_set (r->config, "bin.demangle", "false");
@@ -1334,7 +1335,6 @@ R_API int r_main_radare2(int argc, const char **argv) {
 				r_core_seek (r, seek, true);
 			}
 		}
-
 		if (fullfile) {
 			r_core_block_size (r, r_io_desc_size (iod));
 		}

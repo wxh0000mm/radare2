@@ -409,11 +409,9 @@ static int r_core_file_do_load_for_debug(RCore *r, ut64 baseaddr, const char *fi
 			r_core_bin_set_arch_bits (r, binfile->file, info->arch, info->bits);
 		}
 	}
-
 	if (plugin && !strcmp (plugin->name, "dex")) {
 		r_core_cmd0 (r, "\"(fix-dex,wx `ph sha1 $s-32 @32` @12 ; wx `ph adler32 $s-12 @12` @8)\"\n");
 	}
-
 	return true;
 }
 
@@ -915,6 +913,10 @@ R_API RIODesc *r_core_file_open(RCore *r, const char *file, int flags, ut64 load
 	//used by r_core_bin_load otherwise won't load correctly
 	//this should be argument of r_core_bin_load <shrug>
 	if (loadaddr != UT64_MAX) {
+		RBinFile *binfile = r_bin_cur (r->bin);
+		if (binfile) {
+			binfile->loadaddr = loadaddr;
+		}
 		r_config_set_i (r->config, "bin.laddr", loadaddr);
 	}
 	r_core_cmd0 (r, "=!");

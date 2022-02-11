@@ -1,0 +1,107 @@
+NAME=plaintext strings
+FILE=bins/other/hello.txt
+CMDS=<<EOF
+ob
+?e --
+iz
+?e --
+izz
+?e --
+EOF
+EXPECT=<<EOF
+* 0 3 x86-64 ba:0x00000000 sz:24 bins/other/hello.txt
+--
+--
+[Strings]
+nth paddr      vaddr      len size section type  string
+-------------------------------------------------------
+0   0x00000000 0x00000000 24  24           ascii hello world\nSecond Line\n
+--
+EOF
+RUN
+
+NAME=plaintext strings minusn
+FILE=bins/other/hello.txt
+BROKEN=1
+ARGS=-m 0x4000 -n
+CMDS=<<EOF
+ob
+ob-*
+?e --
+iz
+?e --
+izz
+x 32 @ `izz~[1:-1]`
+?e --
+EOF
+EXPECT=<<EOF
+--
+--
+[Strings]
+nth paddr      vaddr      len size section type  string
+-------------------------------------------------------
+0   0x00000000 0x00000000 24  24           ascii hello world\nSecond Line\n
+- offset -   0 1  2 3  4 5  6 7  8 9  A B  C D  E F  0123456789ABCDEF
+0x00004000  6865 6c6c 6f20 776f 726c 640a 5365 636f  hello world.Seco
+0x00004010  6e64 204c 696e 650a ffff ffff ffff ffff  nd Line.........
+--
+EOF
+RUN
+
+NAME=plaintext strings failing test
+FILE=bins/other/hello.txt
+ARGS=-m 0x4000
+CMDS=<<EOF
+ob
+?e --
+iz
+?e --
+izz
+x 32 @ `izz~[1:-1]`
+?e --
+EOF
+EXPECT=<<EOF
+- 0 3 x86-64 ba:0x00000000 sz:24 bins/other/hello.txt
+* 1 3 x86-0 ba:0x00004000 sz:24 bins/other/hello.txt
+--
+--
+[Strings]
+nth paddr      vaddr      len size section type  string
+-------------------------------------------------------
+0   0x00004000 0x00004000 24  24           ascii hello world\nSecond Line\n
+- offset -   0 1  2 3  4 5  6 7  8 9  A B  C D  E F  0123456789ABCDEF
+0x00004000  6865 6c6c 6f20 776f 726c 640a 5365 636f  hello world.Seco
+0x00004010  6e64 204c 696e 650a ffff ffff ffff ffff  nd Line.........
+--
+EOF
+RUN
+
+NAME=plaintext strings looks good with binfile
+FILE=bins/other/hello.txt
+ARGS=-m 0x4000
+CMDS=<<EOF
+oba
+ob
+?e --
+iz
+?e --
+izz
+x 32 @ `izz~[1:0]`
+?e --
+EOF
+EXPECT=<<EOF
+- 0 3 x86-64 ba:0x00000000 sz:24 bins/other/hello.txt
+- 1 3 x86-0 ba:0x00004000 sz:24 bins/other/hello.txt
+* 2 3 x86-0 ba:0x00004000 sz:24 bins/other/hello.txt
+--
+--
+[Strings]
+nth paddr      vaddr      len size section type  string
+-------------------------------------------------------
+0   0x00004000 0x00004000 24  24           ascii hello world\nSecond Line\n
+- offset -   0 1  2 3  4 5  6 7  8 9  A B  C D  E F  0123456789ABCDEF
+0x00004000  6865 6c6c 6f20 776f 726c 640a 5365 636f  hello world.Seco
+0x00004010  6e64 204c 696e 650a ffff ffff ffff ffff  nd Line.........
+--
+EOF
+RUN
