@@ -3550,7 +3550,7 @@ reaccept:
 				if (!ptr) {
 					r_cons_eprintf ("Cannot malloc in rmt-open len = %d\n", cmd);
 				} else {
-					ut64 baddr = r_config_get_i (core->config, "bin.laddr");
+					ut64 baddr = r_core_get_cur_laddr (core);
 					r_socket_read_block (c, ptr, cmd);
 					ptr[cmd] = 0;
 					ut32 perm = R_PERM_R;
