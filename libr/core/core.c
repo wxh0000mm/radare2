@@ -2864,6 +2864,8 @@ R_API bool r_core_init(RCore *core) {
 		/* XXX memory leak */
 		return false;
 	}
+	core->chan = NULL; // r_th_channel_new ();
+	core->chan_thread = NULL;
 	r_core_setenv (core);
 	core->ev = r_event_new (core);
 	r_event_hook (core->ev, R_EVENT_ALL, cb_event_handler, NULL);
@@ -3109,6 +3111,8 @@ R_API void r_core_fini(RCore *c) {
 	if (!c) {
 		return;
 	}
+	r_th_channel_free (c->chan);
+	r_th_free (c->chan_thread);
 	r_core_task_break_all (&c->tasks);
 	r_core_task_join (&c->tasks, NULL, -1);
 	r_core_wait (c);
@@ -4067,7 +4071,6 @@ R_API PJ *r_core_pj_new(RCore *core) {
 	} else if (!strcmp ("hex", config_num_encoding)) {
 		number_encoding = PJ_ENCODING_NUM_HEX;
 	}
-
 	if (!strcmp ("base64", config_string_encoding)) {
 		string_encoding = PJ_ENCODING_STR_BASE64;
 	} else if (!strcmp ("hex", config_string_encoding)) {
@@ -4078,4 +4081,108 @@ R_API PJ *r_core_pj_new(RCore *core) {
 		string_encoding = PJ_ENCODING_STR_STRIP;
 	}
 	return pj_new_with_encoding (string_encoding, number_encoding);
+}
+
+static RThreadFunctionRet handler(RThread *th) {
+	RCore *core = (RCore *)th->user;
+	r_cons_thready ();
+	while (true) {
+		RThreadChannelMessage *cm = r_th_channel_read (core->chan);
+		if (!cm) {
+		//	r_th_channel_write (core->chan, NULL);
+		//r_th_lock_leave (cm->lock);
+			break;
+		}
+		char *res = r_core_cmd_str (core, (const char *)cm->msg);
+		free (cm->msg);
+		cm->msg = (ut8 *)res;
+		cm->len = strlen (res) +1;
+		r_th_sem_post (cm->sem);
+		break;
+	}
+	return 0;
+}
+
+R_API void r_core_cmd_r(RCore *core, const char *cmd) {
+	if (!core->chan || !core->chan_thread) {
+		core->chan = r_th_channel_new ();
+		core->chan_thread = r_th_new (handler, core, 0);
+		// r_th_start (core->chan_thread, false);
+	}
+	// start a thread that processes all the calls to corecmdstrblah
+	RThreadChannelMessage *msg = r_th_channel_message_new ((const ut8*)cmd, strlen (cmd) + 1);
+	RThreadChannelMessage *response = r_th_channel_write (core->chan, msg);
+	r_th_channel_message_free (msg);
+	msg = r_th_channel_message_read (core->chan, response);
+	if (msg) {
+		eprintf ("%s\n", msg->msg);
+		r_th_channel_message_free (msg);
+	} else {
+		eprintf ("no data%c", 10);
+	}
+	//r_th_channel_message_free (response);
+#if 1
+	r_th_kill (core->chan_thread, 9);
+	r_th_wait (core->chan_thread);
+	r_th_free (core->chan_thread);
+	core->chan_thread = NULL;
+	r_th_channel_free (core->chan);
+	core->chan = NULL;
+#endif
+}
+
+typedef struct {
+	const char *cmd;
+	RCore *core;
+} P;
+
+static RThreadFunctionRet handler2(RThread *th) {
+	P *p = (P *)th->user;
+	RCore *core = p->core;
+	const char *cmd = p->cmd;
+eprintf ("RUN (%s)%c", cmd, 10);
+	// start a thread that processes all the calls to corecmdstrblah
+	RThreadChannelMessage *msg = r_th_channel_message_new ((const ut8*)cmd, strlen (cmd) + 1);
+	RThreadChannelMessage *response = r_th_channel_write (core->chan, msg);
+	msg = r_th_channel_message_read (core->chan, response);
+	if (msg) {
+		r_th_lock_enter (msg->lock);
+		eprintf ("%s\n", msg->msg);
+		r_th_lock_leave (msg->lock);
+	}
+	r_th_channel_message_free (msg);
+	r_th_channel_message_free (response);
+	return 0;
+}
+
+R_API void r_core_cmd_r2(RCore *core, const char *cmd) {
+	P p = {cmd, core};
+	if (!core->chan || !core->chan_thread) {
+		core->chan = r_th_channel_new ();
+		core->chan_thread = r_th_new (handler2, &p, 0);
+		// r_th_start (core->chan_thread, false);
+	}
+	RThreadChannelMessage *cm = r_th_channel_read (core->chan);
+	if (!cm) {
+		//	r_th_channel_write (core->chan, NULL);
+		//r_th_lock_leave (cm->lock);
+		return;
+	}
+	//r_th_lock_enter (cm->lock);
+	char *res = r_core_cmd_str (core, (const char *)cm->msg);
+	if (!res) {
+		eprintf ("cmdstr return null%c", 10);
+		return;
+	}
+	free (cm->msg);
+	cm->msg = (ut8 *)res;
+	cm->len = strlen (res) + 1;
+	r_th_sem_post (cm->sem);
+	r_th_lock_leave (cm->lock);
+	//r_th_kill (core->chan_thread, 9);
+	r_th_wait (core->chan_thread);
+	r_th_free (core->chan_thread);
+	core->chan_thread = NULL;
+	r_th_channel_free (core->chan);
+	core->chan = NULL;
 }

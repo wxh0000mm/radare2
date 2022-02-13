@@ -7,6 +7,7 @@
 
 #include "r_types.h"
 #include "r_userconf.h"
+#include <r_list.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -145,7 +146,28 @@ typedef struct r_th_pool_t {
 	RThread **threads;
 } RThreadPool;
 
+typedef struct {
+	RThreadLock *lock;
+	RThreadSemaphore *sem;
+	RList *stack;
+} RThreadChannel;
+
+typedef struct {
+	ut8 *msg;
+	int len;
+	RThreadLock *lock;
+	RThreadSemaphore *sem;
+} RThreadChannelMessage;
+
 #ifdef R_API
+R_API RThreadChannelMessage *r_th_channel_read(RThreadChannel *tc);
+R_API void r_th_channel_message_free(RThreadChannelMessage *cm);
+R_API RThreadChannelMessage *r_th_channel_write(RThreadChannel *tc, RThreadChannelMessage *cm);
+R_API RThreadChannelMessage *r_th_channel_message_read(RThreadChannel *tc, RThreadChannelMessage *cm);
+R_API RThreadChannelMessage *r_th_channel_message_new (const ut8 *msg, int len);
+R_API RThreadChannel *r_th_channel_new(void);
+R_API void r_th_channel_free(RThreadChannel *tc);
+
 R_API RThread *r_th_new(RThreadFunction fun, void *user, int delay);
 R_API bool r_th_start(RThread *th, int enable);
 R_API int r_th_wait(RThread *th);
