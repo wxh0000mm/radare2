@@ -5204,7 +5204,6 @@ static int cmd_print(void *data, const char *input) {
 		if (p) {
 			l = (int) r_num_math (core->num, p + 1);
 			/* except disasm and memoryfmt (pd, pm) and overlay (po) */
-eprintf ("JAPUTA %d %c", l, 10);
 			if (input[0] != 'd' && input[0] != 't' && input[0] != 'D' && input[0] != 'm' &&
 				input[0] != 'a' && input[0] != 'f' && input[0] != 'i' &&
 				input[0] != 'I' && input[0] != 'o') {
@@ -5228,8 +5227,7 @@ eprintf ("JAPUTA %d %c", l, 10);
 		}
 	}
 	int olen = len;
-at = off;
-eprintf ("AT %llx%c", off, 10);
+	at = off;
 	if (len < 0) {
 		len = -len;
 	}
@@ -5245,9 +5243,8 @@ eprintf ("AT %llx%c", off, 10);
 			if (block) {
 				r_core_block_read (core);
 				memset (block, core->io->Oxff, len + padding);
-				if (off != core->offset) {
-					r_io_read_at (core->io, off, block, len);
-				} else {
+				r_io_read_at (core->io, off, block, len);
+				if (off == core->offset) {
 					memcpy (block, core->block, R_MIN (core->blocksize, len));
 				}
 			}
@@ -5607,8 +5604,9 @@ eprintf ("AT %llx%c", off, 10);
 	case 'd': // "pd"
 	{
 		ut64 use_blocksize = core->blocksize;
-		ut8 bw_disassemble = false;
-		ut32 pd_result = false, processed_cmd = false;
+		bool bw_disassemble = false;
+		bool pd_result = false;
+		bool processed_cmd = false;
 		bool formatted_json = false;
 		if (input[1] && input[2]) {
 			// "pd--" // context disasm
@@ -5677,7 +5675,7 @@ eprintf ("AT %llx%c", off, 10);
 		switch (input[1]) {
 		case 'C': // "pdC"
 			r_core_disasm_pdi (core, l, 0, 'C');
-			pd_result = 0;
+			pd_result = false;
 			processed_cmd = true;
 			break;
 		case 'd': // "pdd" // r2dec
@@ -5694,13 +5692,13 @@ eprintf ("AT %llx%c", off, 10);
 			break;
 		case 'c': // "pdc" // "pDc"
 			r_core_pseudo_code (core, input + 2);
-			pd_result = 0;
+			pd_result = false;
 			processed_cmd = true;
 			break;
 		case ',': // "pd,"
 		case 't': // "pdt"
 			r_core_disasm_table (core, l, r_str_trim_head_ro (input + 2));
-			pd_result = 0;
+			pd_result = false;
 			processed_cmd = true;
 			break;
 		case 'k': // "pdk" -print class
@@ -5716,7 +5714,7 @@ eprintf ("AT %llx%c", off, 10);
 			} else {
 				r_core_disasm_pdi (core, l, 0, 0);
 			}
-			pd_result = 0;
+			pd_result = false;
 			break;
 		case 'a': // "pda"
 			processed_cmd = true;
@@ -5809,7 +5807,7 @@ eprintf ("AT %llx%c", off, 10);
 								input[2] == 'J', NULL, NULL);
 						}
 						free (block);
-						pd_result = 0;
+						pd_result = false;
 					}
 				} else {
 					eprintf ("Cannot find function at 0x%08"PFMT64x "\n", core->offset);
@@ -5886,7 +5884,7 @@ eprintf ("AT %llx%c", off, 10);
 					pj_end (pj);
 					r_cons_printf ("%s\n", pj_string (pj));
 					pj_free (pj);
-					pd_result = 0;
+					pd_result = false;
 					r_config_set (core->config, "asm.bbmiddle", orig_bb_middle);
 				} else if (f) {
 					ut64 linearsz = r_anal_function_linear_size (f);
@@ -5904,7 +5902,7 @@ eprintf ("AT %llx%c", off, 10);
 							// r_core_cmdf (core, "pD %d @ 0x%08" PFMT64x, f->_size > 0 ? f->_size: r_anal_function_realsize (f), f->addr);
 						}
 					}
-					pd_result = 0;
+					pd_result = false;
 				} else {
 					eprintf ("pdf: Cannot find function at 0x%08"PFMT64x "\n", core->offset);
 					processed_cmd = true;
@@ -5946,7 +5944,7 @@ eprintf ("AT %llx%c", off, 10);
 					}
 				}
 				r_cons_break_pop ();
-				pd_result = 0;
+				pd_result = false;
 			}
 			break;
 		case 'j': // pdj
@@ -5956,7 +5954,7 @@ eprintf ("AT %llx%c", off, 10);
 			} else {
 				cmd_pdj (core, input + 2, block, len);
 			}
-			pd_result = 0;
+			pd_result = false;
 			break;
 		case 'J': // pdJ
 			formatted_json = true;
@@ -5970,7 +5968,7 @@ eprintf ("AT %llx%c", off, 10);
 		case '?': // "pd?"
 			processed_cmd = true;
 			r_core_cmd_help (core, help_msg_pd);
-			pd_result = 0;
+			pd_result = false;
 		case '.':
 		case '-':
 		case '+':
@@ -6621,8 +6619,8 @@ eprintf ("AT %llx%c", off, 10);
 			break;
 		case '0': // "px0"
 			if (l) {
-				int len = r_str_nlen ((const char *)block, core->blocksize);
-				r_print_bytes (core->print, block, len, "%02x");
+				int zlen = r_str_nlen ((const char *)block, len);
+				r_print_bytes (core->print, block, zlen, "%02x");
 			}
 			break;
 		case 'a': // "pxa"
@@ -7094,7 +7092,8 @@ eprintf ("AT %llx%c", off, 10);
 						len = core->blocksize;
 					}
 					r_core_block_read (core);
-					r_print_hexdump (core->print, r_core_pava (core, core->offset),
+					r_print_hexdump (core->print,
+						r_core_pava (core, off),
 						block, len, 16, 1, 1);
 				} else {
 					r_core_print_cmp (core, from, to);
