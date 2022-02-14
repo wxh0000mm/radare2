@@ -5175,11 +5175,11 @@ static int cmd_print(void *data, const char *input) {
 	int i, len, ret;
 	ut8* block = NULL;
 	ut32 tbs = core->blocksize;
-	ut64 n, off, from, to, at, ate, piece;
+	ut64 n, from, to, at, ate, piece;
 	ut64 tmpseek = UT64_MAX;
 	const size_t addrbytes = core->io->addrbytes;
 	i = l = len = ret = 0;
-	n = off = from = to = at = ate = piece = 0;
+	n = from = to = at = ate = piece = 0;
 	PJ *pj = NULL;
 
 	/* !strncmp (input, "du", 2) */
@@ -5188,8 +5188,9 @@ static int cmd_print(void *data, const char *input) {
 		return cmd_pdu (core, input + 2);
 	}
 
+	ut64 off = core->offset;
+
 	r_print_init_rowoffsets (core->print);
-	off = core->offset;
 	tmpseek = core->offset;
 	l = len = core->blocksize;
 	if (input[0] && input[1]) {
@@ -5292,7 +5293,7 @@ static int cmd_print(void *data, const char *input) {
 		}
 	}
 	// TODO figure out why `f eax=33; f test=eax; pa call test` misassembles if len is 0
-	core->num->value = len ? len : core->blocksize;
+	core->num->value = len > 0 ? len : core->blocksize;
 #if 0
 	if (off != UT64_MAX) {
 		r_core_seek (core, off, SEEK_SET);
@@ -5608,31 +5609,30 @@ static int cmd_print(void *data, const char *input) {
 		bool pd_result = false;
 		bool processed_cmd = false;
 		bool formatted_json = false;
-		if (input[1] && input[2]) {
-			// "pd--" // context disasm
-			if (!strncmp (input + 1, "--", 2)) {
-				char *offs = r_str_newf ("%s", input + 2);
-				if (offs) {
-					ut64 sz = r_num_math (core->num, offs);
-					char *fmt;
-					if (((st64)sz * -1) > core->offset) {
-						// the offset is smaller than the negative value
-						// so only print -offset
-						fmt = r_str_newf ("d %"PFMT64d, -1 * core->offset);
-					} else {
-						fmt = r_str_newf ("d %s", input + 2);
-					}
-					if (fmt) {
-						cmd_print (core, fmt);
-						strcpy (fmt + 2, input + 3);
-						cmd_print (core, fmt);
-						free (fmt);
-					}
-					free (offs);
+		core->offset = off;
+		// "pd--" // context disasm
+		if (input[1] && input[2] && !strncmp (input + 1, "--", 2)) {
+			char *offs = r_str_newf ("%s", input + 2);
+			if (offs) {
+				ut64 sz = r_num_math (core->num, offs);
+				char *fmt;
+				if (((st64)sz * -1) > off) {
+					// the offset is smaller than the negative value
+					// so only print -offset
+					fmt = r_str_newf ("d %"PFMT64d, -1 * off);
+				} else {
+					fmt = r_str_newf ("d %s", input + 2);
 				}
-				ret = 0;
-				goto beach;
+				if (fmt) {
+					cmd_print (core, fmt);
+					strcpy (fmt + 2, input + 3);
+					cmd_print (core, fmt);
+					free (fmt);
+				}
+				free (offs);
 			}
+			ret = 0;
+			goto beach;
 		}
 
 		if (input[1] == 'x') { // pdx
@@ -5640,12 +5640,9 @@ static int cmd_print(void *data, const char *input) {
 			return 0;
 		}
 
-		const char *sp = NULL;
-		if (input[1] == '.' || input[1] == '+') {
-			sp = input + 2;
-		} else {
-			sp = strchr (input + 1, ' ');
-		}
+		const char *sp = (input[1] == '.' || input[1] == '+')
+			? input + 2: strchr (input + 1, ' ');
+
 		if (!sp && input[1] == '-') {
 			sp = input + 1;
 		}
@@ -5670,7 +5667,10 @@ static int cmd_print(void *data, const char *input) {
 			l = use_blocksize;
 		}
 		// may be unnecessary, fixes 'pd 1;pdj 100;pd 1' bug
+#if 1
+		core->offset = at; // "pd" doesnt know about the current offset for pd -X
 		r_core_block_read (core);
+#endif
 
 		switch (input[1]) {
 		case 'C': // "pdC"
@@ -6011,17 +6011,17 @@ static int cmd_print(void *data, const char *input) {
 						if (!(block1 = malloc (l))) {
 							break;
 						}
-						r_io_read_at (core->io, addr - l, block1, l); // core->blocksize);
-						core->num->value = r_core_print_disasm (core, addr - l, block1, l, l, 0, NULL, true, formatted_json, NULL, NULL);
+						r_io_read_at (core->io, off, block1, l); // core->blocksize);
+						core->num->value = r_core_print_disasm (core, off, block1, l, l, 0, NULL, true, formatted_json, NULL, NULL);
 					} else { // pd
-						int instr_len;
-						if (!r_core_prevop_addr (core, core->offset, l, &start)) {
+						if (!r_core_prevop_addr (core, off, l, &start)) {
 							// anal ignorance.
-							start = r_core_prevop_addr_force (core, core->offset, l);
+							start = r_core_prevop_addr_force (core, off, l);
 						}
-						instr_len = core->offset - start;
-						ut64 prevaddr = core->offset;
-						int bs = core->blocksize, bs1 = addrbytes * instr_len;
+						int instr_len = off - start;
+						ut64 prevaddr = off;
+						int bs = core->blocksize;
+						int bs1 = addrbytes * instr_len;
 						if (bs1 > bs) {
 							ut8 *tmpblock = realloc (block1, bs1);
 							if (!tmpblock) {
@@ -6039,7 +6039,7 @@ static int cmd_print(void *data, const char *input) {
 								bs1 - (bs - bs % addrbytes));
 						}
 						core->num->value = r_core_print_disasm (core,
-								core->offset, block1,
+								off, block1,
 								R_MAX (bs, bs1), l, 0, NULL,
 								false, formatted_json, NULL,
 								NULL);
@@ -6056,9 +6056,9 @@ static int cmd_print(void *data, const char *input) {
 					}
 					block1 = malloc (addrbytes * l);
 					if (block1) {
-						r_io_read_at (core->io, addr, block1, addrbytes * l);
+						r_io_read_at (core->io, core->offset, block1, addrbytes * l);
 						core->num->value = r_core_print_disasm (core,
-								addr, block1, addrbytes * l, l,
+								off, block1, addrbytes * l, l,
 								0, NULL, true, formatted_json,
 								NULL, NULL);
 					} else {
@@ -6072,7 +6072,7 @@ static int cmd_print(void *data, const char *input) {
 						}
 					}
 					core->num->value = r_core_print_disasm (core,
-							addr, block, len, l, 0, NULL,
+							addr, core->block, core->blocksize, l, 0, NULL,
 							false, formatted_json, NULL, NULL);
 				}
 			}
@@ -7380,7 +7380,7 @@ static int cmd_print(void *data, const char *input) {
 	}
 beach:
 	free (block);
-	if (tmpseek != UT64_MAX) {
+	if (tmpseek != UT64_MAX && tmpseek != core->offset) {
 		r_core_seek (core, tmpseek, SEEK_SET);
 		r_core_block_read (core);
 	}
