@@ -1221,9 +1221,11 @@ static void cmd_pdj(RCore *core, const char *arg, ut8* block, int len) {
 	}
 	pj_a (pj);
 	ut8 *data = malloc (core->blocksize);
-	memcpy (data, core->block, core->blocksize);
-	r_core_print_disasm_json (core, core->offset, data, core->blocksize, nblines, pj);
-	free (data);
+	if (data) {
+		memcpy (data, core->block, core->blocksize);
+		r_core_print_disasm_json (core, core->offset, data, core->blocksize, nblines, pj);
+		free (data);
+	}
 	pj_end (pj);
 	r_cons_println (pj_string (pj));
 	pj_free (pj);
@@ -5947,7 +5949,7 @@ static int cmd_print(void *data, const char *input) {
 				pd_result = false;
 			}
 			break;
-		case 'j': // pdj
+		case 'j': // "pdj"
 			processed_cmd = true;
 			if (*input == 'D') {
 				cmd_pDj (core, input + 2);
@@ -6039,7 +6041,7 @@ static int cmd_print(void *data, const char *input) {
 								bs1 - (bs - bs % addrbytes));
 						}
 						core->num->value = r_core_print_disasm (core,
-								off, block1,
+								addr - bs1, block1,
 								R_MAX (bs, bs1), l, 0, NULL,
 								false, formatted_json, NULL,
 								NULL);
