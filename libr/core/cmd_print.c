@@ -5174,7 +5174,6 @@ static int cmd_print(void *data, const char *input) {
 	st64 l;
 	int i, len, ret;
 	ut8* block = NULL;
-	bool myblock = false;
 	ut32 tbs = core->blocksize;
 	ut64 n, off, from, to, at, ate, piece;
 	ut64 tmpseek = UT64_MAX;
@@ -5191,6 +5190,7 @@ static int cmd_print(void *data, const char *input) {
 
 	r_print_init_rowoffsets (core->print);
 	off = core->offset;
+	tmpseek = core->offset;
 	l = len = core->blocksize;
 	if (input[0] && input[1]) {
 		int idx = (input[0] == 'h')? 2: 1;
@@ -5204,13 +5204,13 @@ static int cmd_print(void *data, const char *input) {
 		if (p) {
 			l = (int) r_num_math (core->num, p + 1);
 			/* except disasm and memoryfmt (pd, pm) and overlay (po) */
+eprintf ("JAPUTA %d %c", l, 10);
 			if (input[0] != 'd' && input[0] != 't' && input[0] != 'D' && input[0] != 'm' &&
 				input[0] != 'a' && input[0] != 'f' && input[0] != 'i' &&
 				input[0] != 'I' && input[0] != 'o') {
 				if (l < 0) {
 					off = core->offset + l;
 					len = l = -l;
-					tmpseek = core->offset;
 				} else {
 					len = l;
 					if (l > core->blocksize) {
@@ -5221,17 +5221,21 @@ static int cmd_print(void *data, const char *input) {
 				}
 			} else {
 				len = l;
+				if (l < 0) {
+					off = core->offset + l;
+				}
 			}
 		}
 	}
 	int olen = len;
-	at = off;
+at = off;
+eprintf ("AT %llx%c", off, 10);
 	if (len < 0) {
 		len = -len;
 	}
-// 	core->offset = at; // 
 	const int padding = core->blocksize + 256;
 	block = malloc (len + padding);
+	// if (!block) die
 	if (block) {
 		if (len > core->blocksize) {
 			memset (block, core->io->Oxff, len + padding);
@@ -5276,7 +5280,6 @@ static int cmd_print(void *data, const char *input) {
 			}
 		}
 	}
-
 	if (input[0] && input[0] != 'z' && input[1] == 'f' && input[2]!='?') {
 		RAnalFunction *f = r_anal_get_fcn_in (core->anal, core->offset, 0);
 		// R_ANAL_FCN_TYPE_FCN|R_ANAL_FCN_TYPE_SYM);
@@ -5295,9 +5298,9 @@ static int cmd_print(void *data, const char *input) {
 	core->num->value = len ? len : core->blocksize;
 #if 0
 	if (off != UT64_MAX) {
-	//	r_core_seek (core, off, SEEK_SET);
+		r_core_seek (core, off, SEEK_SET);
 		r_io_read_at (core->io, off, block, len);
-		// r_core_block_read (core);
+		r_core_block_read (core);
 	}
 #endif
 	switch (*input) {
@@ -7377,9 +7380,7 @@ static int cmd_print(void *data, const char *input) {
 		break;
 	}
 beach:
-	if (myblock) {
-		free (block);
-	}
+	free (block);
 	if (tmpseek != UT64_MAX) {
 		r_core_seek (core, tmpseek, SEEK_SET);
 		r_core_block_read (core);
